@@ -1,6 +1,11 @@
 import "dotenv/config"; // Load .env into process.env
 import { z } from "zod"; // Import Zod for env validation
-import { LightstreamerClient, Subscription } from "lightstreamer-client"; // Import Lightstreamer client types
+//import Lightstreamer from "lightstreamer-client"; // Import Lightstreamer namespace (compat)
+//const { LightstreamerClient, Subscription } = Lightstreamer as any; // Extract exports safely
+import Lightstreamer from "lightstreamer-client"; // Import Lightstreamer namespace
+const { LightstreamerClient, Subscription } = Lightstreamer as any; // Extract exports safely
+
+// Import Lightstreamer client types
 
 const envSchema = z.object({ // Define env schema
   CAPITAL_REST_BASE_URL: z.string().url(), // REST base URL
@@ -179,8 +184,8 @@ async function main() { // Main
   }; // End gate
 
   let stopped = false; // Stream stop flag
-  let client: LightstreamerClient | null = null; // LS client
-  let subs: Subscription[] = []; // Subscriptions
+  let client: any = null; // LS client
+  let subs: any[] = []; // Subscriptions
   let attempt = 0; // Reconnect attempt
 
   const connectLoop = async () => { // Connection loop
@@ -188,9 +193,9 @@ async function main() { // Main
       try { // Try connect
         const ls = new LightstreamerClient(config.streamUrl); // Create client
         client = ls; // Store
-        ls.connectionOptions.setRetryDelay(0); // Disable internal retry
+        ls.connectionOptions.setRetryDelay(1000); // Must be > 0 (Lightstreamer requirement)
         ls.addListener({ // Add status listener
-          onStatusChange: (status) => { // Status callback
+          onStatusChange: (status: string) => {
             if (status.startsWith("DISCONNECTED") && !stopped) console.error(`[ERROR] Stream disconnected: ${status}`); // Log
           } // End callback
         }); // End listener
@@ -207,7 +212,7 @@ async function main() { // Main
           const sub = new Subscription(config.streamMode, item, fields); // Create subscription
           sub.setRequestedSnapshot("no"); // No snapshot
           sub.addListener({ // Add listener
-            onItemUpdate: (update) => { // Update callback
+            onItemUpdate: (update: any) => {
               if (stopped) return; // If stopped
               if (!isAllowed(instrument)) return; // If market closed/suspended
               const raw: Record<string, string> = {}; // Raw map
@@ -226,7 +231,7 @@ async function main() { // Main
               }; // End tick
               console.log(formatTick(tick)); // Print instantly
             }, // End update
-            onSubscriptionError: (_code, message) => { // Subscription error
+            onSubscriptionError: (_code: number, message: string) => {
               console.error(`[ERROR] Subscription error ${instrument}: ${message}`); // Log
             } // End subscription error
           }); // End listener
